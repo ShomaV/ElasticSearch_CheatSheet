@@ -1,0 +1,415 @@
+Notes:
+-> Default result set size is 10
+
+1. Create mapping (Ex: Prepare Table Schema)
+PUT /ecommerce
+{
+  "mappings":{
+    "product":{
+      "properties": {
+        "name":{
+          "type":"string"
+        },
+        "price":{
+          "type":"double"
+        },
+        "description":{
+          "type":"string"
+        },
+        "status":{
+          "type":"string"
+        },
+        "quantity":{
+          "type":"integer"
+        },
+        "categories":{
+          "type": "nested",
+          "properties": {
+            "name":{
+              "type":"string"
+            }
+          }
+        },
+        "tags":{
+          "type": "string"
+        }
+      }
+    }
+  }
+}
+
+2. Upload test data using test-data.json using postmaster
+
+3. Insert an individual record
+PUT ecommerce/product/1001
+{
+  "name":"Zend Framework 2 from Beginners to Professional",
+  "price":30.00,
+  "description":"Learn Zend Framework in just a few hours!",
+  "status":"active",
+  "quantity":1,
+  "categories":[
+    {"name":"Software"}
+    ],
+  "tags":["zend framework","zf2","php","programming"]
+}
+
+4. To replace the existing document
+PUT ecommerce/product/1001
+{
+  "name":"Zend Framework 2 from Beginners to Professional",
+  "price":40.00,
+  "description":"Learn Zend Framework in just a few hours!",
+  "status":"active",
+  "quantity":1,
+  "categories":[
+    {"name":"Software"}
+    ],
+  "tags":["zend framework","zf2","php","programming"]
+}
+
+5. Updating existing documents
+POST ecommerce/product/1001/_update
+{
+	"doc":{ 
+    "price":50.00
+  }
+}
+
+6. To find all indices
+GET /_cat/indices/?v
+
+7. Delete a document
+DELETE /ecommerce/product/1001
+
+8. Bulk insert
+POST /ecommerce/product/_bulk
+{"index":{"_id":"1002"}}
+{"name":"Why Elasticsearch is Awesome","price":"50.00","description":"This book is all about Elasticsearch!","status":"active","quantity":12,"categories":[{"name":"Software"}],"tag":["elasticsearch","programming"]}
+{"index":{"_id":"1003"}}
+{"name":"Peanuts","price":"3.00","description":"Salted peanuts","status":"active","quantity":56,"categories":[{"name":"Food"}],"tags":["snacks","munching"]}
+
+9. Bulk Actions
+POST ecommerce/product/_bulk
+{"delete":{"_id":"1"}}
+{"update":{"_id":"1002"}}
+{"doc":{"quantity":11}}
+
+10. Retrieve a single document by Id
+GET ecommerce/product/1
+
+11. Specifying the index name and type in the action instead of the url
+POST /_bulk
+{"update":{"_id":"1002","_index":"ecommerce","_type":"product"}}
+{"doc":{"quantity":10}}
+
+12. Searching using query strings
+a. Match all documents
+	GET /ecommerce/product/_search?q=*
+
+b. Searching for the "pasta" in all fields
+	GET /ecommerce/product/_search?q=pasta
+
+c. Specify to search in a particular field
+	GET /ecommerce/product/_search?q=description:pasta
+		OR
+	GET /ecommerce/product/_search?q=name:pasta
+
+d. Embed boolean logic into the query string
+	GET /ecommerce/product/_search?q=name:(pasta%20and%20spaghetti)
+			OR
+	GET /ecommerce/product/_search?q=(name:(pasta%20and%20spaghetti)%20AND%20status=active)
+
+e. Using boolean operators
+	GET /ecommerce/product/_search?q=name:+pasta%20and%20-spaghetti
+
+f. Phrase query
+	->Default boolean operator is always : OR
+	->To search for a particular phrase use the phrase within quotes:
+	GET /ecommerce/product/_search?q=name:%22pasta%20spaghetti%22
+
+g. Standard Analyser
+	-> Used by default
+	-> Removes/ignores special characters like -,! etc while searching.
+	-> GET /_analyze?analyzer=standard&text=Pasta%22-%22Spaghetti
+		This returns a set of tokens
+	->Special characters must be used along with \ (backslash)
+
+13. Searching with Query DSL
+a. Matches all document
+GET /ecommerce/product/_search
+{
+  "query":{
+    "match_all": {}
+  }
+}
+
+b. Match one or more fields for values
+GET /ecommerce/product/_search
+{
+  "query":{
+    "match": {
+      "name": "pasta"
+    }
+  }
+}
+
+c. Match a value in multiple fields
+GET /ecommerce/product/_search
+{
+  "query":{
+    "multi_match": {
+      "query": "pasta",
+      "fields": ["name","description"]
+    }
+  }
+}
+
+d. Searching for phrases
+GET /ecommerce/product/_search
+{
+  "query":{
+    "match_phrase": {
+      "name": "Pasta Spaghetti"
+    }
+  }
+}
+
+14. Term level queries
+	->are used for exact matching of values
+	->search queries are not analyzed before matching as is the case for full text queries
+	->To tell elastic search not to analyze a fields value which means they are added to the index as is without removing any special
+	characters, to do this, Set the index property of a field to "not_analyzed"
+GET /ecommerce/product/_search
+{
+  "query":{
+    "term": {
+      "status": {
+        "value": "active"
+      }
+    }
+  }
+}
+
+b. Matches multiple values
+GET /ecommerce/product/_search
+{
+  "query":{
+    "terms": {
+      "status": [
+        "active",
+        "inactive"
+      ]
+    }
+    }
+  }
+}
+
+c. Matches values in a certain range
+GET /ecommerce/product/_search
+{
+  "query":{
+    "range": {
+      "quantity": {
+        "gte": 1,
+        "lte": 10
+      }
+    }
+  }
+}
+
+15. Compound Queries
+a. Query with boolean logic
+	->Logical AND
+GET /ecommerce/product/_search
+{
+  "query":{
+    "bool": {
+      "must": [
+        {"match": {
+          "name": "pasta"
+        }},
+        {"match": {
+          "name": "Spaghetti"
+        }
+        }
+      ]
+    }
+  }
+
+b. Use "must_not" to exclude particular fields/values
+
+GET /ecommerce/product/_search
+{
+  "query":{
+    "bool": {
+      "must": [
+        {"match": {
+          "name": "pasta"
+        }}
+      ],
+      "must_not": [
+        {
+          "match": {
+            "name": "Spaghetti"
+          }
+        }
+      ]
+    }
+  }
+}
+
+c. To use logical OR use the "should" clause
+ 	-> Acts as an optional
+GET /ecommerce/product/_search
+{
+  "query":{
+    "bool": {
+      "must": [
+        {"match": {
+          "name": "pasta"
+        }}
+      ],
+      "should": [
+        {
+          "match": {
+            "name": "Spaghetti"
+          }
+        }
+      ]
+    }
+  }
+}
+}
+
+16. function_score
+	-> Lets you modify the score of a document by using a function inorder to boost the score a document and boost the score based
+	on popularity
+
+17. Boosting
+	->Used to reduce the score of documents that match a certain query.
+
+18. Searching accross indexes and mapping types
+	
+	a. Create a new index by inserting a new document into an non-existant index
+	PUT /myfoodblog/recipe/1
+{
+  "name":"Pasta Quattro Formaggi",
+  "description":"First you boil the pasta, then you add the cheese.",
+  "ingredients":[{
+    "name":"Pasta",
+    "amount":"500mg"
+  },
+  {
+    "name":"Fontina cheese",
+    "amount":"100mg"
+  },
+  {
+    "name":"Parmesan cheese",
+    "amount":"100mg"
+  },
+  {
+    "name":"Romano cheese",
+    "amount":"100mg"
+  },
+  {
+    "name":"Gorgonzola cheese",
+    "amount":"100mg"
+  }
+  ]
+}
+
+	b. To return the mapping type of a index
+GET /myfoodblog
+
+	c. Searching accross multiple indexes 
+GET /ecommerce,myfoodblog/product/_search?q=pasta
+
+	d. Searching accross multiple mappings 
+GET /ecommerce,myfoodblog/product,recipe/_search?q=pasta&size=15
+
+	e. Query to include/exclude indexes while searching
+GET /-ecommerce,%2Bmyfoodblog/product,recipe/_search?q=pasta
+	-> - excludes the ecommerce index from searching
+
+	f. Being able to search for all types
+GET /ecommerce/_search?q=pasta
+
+	g. Search all of the indexes with the cluster
+GET /_all/product/_search?q=pasta
+
+	h. To search for any type
+GET /_search?q=pasta
+
+19. Fuzzy searching
+	->Provides edit distance for characters.
+	->allowing typo to auto-correct and search
+	->fuzzyness is the number of characters that are allowed to be different is a search term
+	->default number is 2 and maximum is 2 for performance issue
+
+	a. With query string
+GET /ecommerce/product/_search?q=past~1
+
+	b. With query DSL
+GET /ecommerce/product/_search
+{
+  "query": {
+    "match": {
+      "name": {
+        "query": "past",
+        "fuzziness": 1
+      }
+    }
+  }
+}
+
+	c.Fuzziness=Auto
+	->Always recommended.
+	->Determines the value of fuzziness based on the length of the search term.
+	->Elastic search will determine the most appropriate maximum edit distance based on the length of the search query.
+	->If the length is 0-2 = match exactly.
+	->If the length 3 to 5 = edit distance is 1.
+	->If the length is greater than 5 = edit distance is 2.
+
+GET /ecommerce/product/_search
+{
+  "query": {
+    "match": {
+      "name": {
+        "query": "past",
+        "fuzziness": "AUTO"
+      }
+    }
+  }
+}
+
+	d. Understand performance consideration 
+	->When performing fuzzy queries, the query is compared to terms stored within an index.Hence the analysed terms are searched
+	than the actual stored document. Hence might also lead to confusing results.
+	->Takes more time than normal searches because they do not use binary search.
+	->Performance can be used by increasing the length of the prefix term.
+
+19. Proximity Searches
+	->Allows for the order of the terms to be different.
+	->Allows maximum edit distance of terms of words or terms within a phrase.
+
+	a. Using Query string
+GET /ecommerce/product/_search?q=name:%22pasta%20spaghetti%22~2
+
+GET /ecommerce/product/_search?q=description:%22pasta%20spaghetti%22~1
+
+	b. Using query DSL
+GET /ecommerce/product/_search
+{
+  "query": {
+    "match_phrase": {
+      "name": {
+        "query": "pasta spaghetti",
+        "slop":2
+      }
+    }
+  }
+}
+
+20. Boosting
+
